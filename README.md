@@ -1,10 +1,11 @@
-# MS Editor Media Hub Android project
+# MS Editor Android Project
 
-This project loads the live MS Editor Media Hub GitHub Pages site in an Android WebView.
+- App display name: MS Editor
+- Application ID: `com.mseditor.mediahub` (preserved)
+- Launcher icon: supplied MS Editor logo
+- Website backend: https://sajawalkhan12.github.io/ms-editor-media-hub-/
 
-## Build APK with GitHub Actions
-1. Upload/replace the contents of this project in the Android source repository.
-2. Open the Actions tab and run `Build MS Editor Android APK` (or push to `main`).
-3. Download the `MS-Editor-Media-Hub-APK` artifact after a successful run.
+## Build APK
+Run `gradle assembleDebug` in a Java 17 environment, or upload this project to GitHub and run the included GitHub Actions workflow (`Build Android APK`).
 
-The WebView changes improve mobile touch/scroll handling and preserve JavaScript, DOM storage, cookies, and file chooser support. They do not modify the website itself.
+Note: this project currently displays the existing website inside Android WebView. The app label, launcher icon, and Android system-bar styling are updated; this is not a full native rewrite of all website screens. Installing over an existing app also requires a compatible signing certificate.
