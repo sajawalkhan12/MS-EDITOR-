@@ -3,7 +3,11 @@ name: Build Updated MS Editor APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -13,55 +17,91 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Check required files
+        run: |
+          echo "Checking repository files..."
+
+          if [ ! -f "MS-Editor.zip" ]; then
+            echo "ERROR: MS-Editor.zip repository root mein nahi mili."
+            echo "Android project ZIP ko repository root mein upload karein."
+            exit 1
+          fi
+
+          if [ ! -f "index.html" ]; then
+            echo "ERROR: index.html repository root mein nahi mili."
+            echo "Updated HTML file ko index.html naam se upload karein."
+            exit 1
+          fi
+
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-
       - name: Extract Android project
         run: |
-          unzip MS-Editor.zip -d android-src
-          find android-src -name settings.gradle.kts
+          mkdir -p android-src
+          unzip -q MS-Editor.zip -d android-src
 
-      - name: Apply new HTML update
-        run: |
-          HTML_FILE="index.html"
-          PROJECT="android-src/ms-editor-media-hub-android-main"
+          GRADLE_FILE=$(find android-src -name settings.gradle.kts \
+            -o -name settings.gradle | head -n 1)
 
-          if [ ! -f "$HTML_FILE" ]; then
-            echo "ERROR: Repository root mein index.html nahi mili."
-            echo "Apni nayi HTML update ko index.html naam se upload karein."
+          if [ -z "$GRADLE_FILE" ]; then
+            echo "ERROR: Android Gradle project nahi mila."
             exit 1
           fi
 
-          ASSETS_DIR=$(find "$PROJECT/app/src/main" -type d -name assets | head -n 1)
+          PROJECT_DIR=$(dirname "$GRADLE_FILE")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          if [ -z "$ASSETS_DIR" ]; then
-            mkdir -p "$PROJECT/app/src/main/assets"
-            ASSETS_DIR="$PROJECT/app/src/main/assets"
-          fi
+          echo "Android project: $PROJECT_DIR"
 
-          cp "$HTML_FILE" "$ASSETS_DIR/index.html"
-          echo "New HTML update copied to: $ASSETS_DIR/index.html"
+      - name: Apply updated HTML
+        run: |
+          ASSETS_DIR="$PROJECT_DIR/app/src/main/assets"
+          mkdir -p "$ASSETS_DIR"
+
+          cp index.html "$ASSETS_DIR/index.html"
+
+          echo "Updated HTML copied successfully."
 
       - name: Set app name
         run: |
-          sed -i 's/android:label="MS Editor Media Hub"/android:label="MS Editor"/' \
-            android-src/ms-editor-media-hub-android-main/app/src/main/AndroidManifest.xml
+          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
 
-      - name: Build APK
+          if [ -f "$MANIFEST" ]; then
+            sed -i 's/android:label="MS Editor Media Hub"/android:label="MS Editor"/' "$MANIFEST"
+          fi
+
+      - name: Build Android APK
         run: |
-          cd android-src/ms-editor-media-hub-android-main
-          gradle assembleDebug
+          cd "$PROJECT_DIR"
 
-      - name: Upload updated APK
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          else
+            echo "ERROR: gradlew file nahi mili."
+            echo "Android project mein Gradle wrapper shamil hona chahiye."
+            exit 1
+          fi
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MS-Editor-Updated-APK
-          path: android-src/ms-editor-media-hub-android-main/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+### GitHub میں کہاں پیسٹ کرنا ہے؟
+
+1. اپنی [MS Editor GitHub Repository](https://github.com/sajawalkhan12/ms-editor-media-hub-?utm_source=chatgpt.com) کھولیں۔
+2. `.github/workflows/build-apk.yml` فائل کھولیں۔
+3. Edit (✏️) دبائیں اور پرانا کوڈ ہٹا کر اوپر والا کوڈ پیسٹ کریں۔
+4. **Commit changes** دبائیں۔
+5. پھر **Actions** ٹیب میں جا کر build کا نتیجہ دیکھیں۔
+6. کامیاب ہونے پر `MS-Editor-Updated-APK` artifact ڈاؤن لوڈ کریں۔
+
+**اہم:** ریپوزٹری کے مرکزی فولڈر میں `MS-Editor.zip` اور درست شدہ `index.html` دونوں موجود ہونے چاہییں۔ اگر آپ کی ZIP کا نام مختلف ہے تو کوڈ میں اس کا اصل نام استعمال کریں۔ یہ workflow APK بنانے کے لیے ہے؛ بلیک اسکرین اور پوسٹس کا مسئلہ تبھی ٹھیک ہوگا جب `index.html` اور Android project میں اصل خرابی بھی درست ہو۔
