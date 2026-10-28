@@ -1,11 +1,10 @@
 # MS Editor Android Project
 
-- App display name: MS Editor
-- Application ID: `com.mseditor.mediahub` (preserved)
-- Launcher icon: supplied MS Editor logo
-- Website backend: https://sajawalkhan12.github.io/ms-editor-media-hub-/
+- Display name: MS Editor
+- Application ID: `com.mseditor.mediahub`
+- Launcher icon: MS Editor logo
+- Home screen: dark, teal-accented mobile UI inspired by the supplied reference video.
+- The app retains a link to the existing live MS Editor Hub at https://sajawalkhan12.github.io/ms-editor-media-hub-/ for its live content/backend-connected features.
 
-## Build APK
-Run `gradle assembleDebug` in a Java 17 environment, or upload this project to GitHub and run the included GitHub Actions workflow (`Build Android APK`).
-
-Note: this project currently displays the existing website inside Android WebView. The app label, launcher icon, and Android system-bar styling are updated; this is not a full native rewrite of all website screens. Installing over an existing app also requires a compatible signing certificate.
+## Build
+The repository workflow extracts this project and runs `gradle assembleDebug` with Java 17 and Gradle 8.7. The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
