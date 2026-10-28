@@ -7,8 +7,6 @@
         android:allowBackup="true"
         android:debuggable="true"
         android:label="MS Editor Media Hub"
-        android:icon="@drawable/ic_ms_media_hub"
-        android:roundIcon="@drawable/ic_ms_media_hub"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
