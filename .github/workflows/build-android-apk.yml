@@ -1,4 +1,4 @@
-name: Build Updated MS Editor APK
+name: Build MS Editor APK
 
 on:
   workflow_dispatch:
@@ -17,83 +17,82 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
       - name: Find Android project
         shell: bash
         run: |
           set -e
 
-          PROJECT_DIR=""
-
-          # First, look for an Android project already in the repository.
-          GRADLEW_FILE=$(find . -type f -name gradlew \
-            -not -path './.git/*' | head -n 1 || true)
-
-          if [ -n "$GRADLEW_FILE" ]; then
-            PROJECT_DIR=$(dirname "$GRADLEW_FILE")
+          if [ -f "settings.gradle.kts" ] || [ -f "settings.gradle" ]; then
+            PROJECT="."
           else
-            # Otherwise, extract an Android project ZIP if one exists.
-            ZIP_FILE=$(find . -maxdepth 2 -type f -iname '*.zip' \
-              -not -path './.git/*' | head -n 1 || true)
+            ZIP_FILE=""
+
+            for f in MS-Editor.zip MS-Editor-Android-Updated-Project.zip; do
+              if [ -f "$f" ]; then
+                ZIP_FILE="$f"
+                break
+              fi
+            done
 
             if [ -z "$ZIP_FILE" ]; then
-              echo "ERROR: Android project ya ZIP file nahi mili."
+              echo "ERROR: Android project ZIP nahi mili."
               exit 1
             fi
 
             mkdir -p android-src
-            unzip -q "$ZIP_FILE" -d android-src
+            unzip -oq "$ZIP_FILE" -d android-src
 
-            GRADLEW_FILE=$(find android-src -type f -name gradlew \
-              | head -n 1 || true)
+            SETTINGS=$(find android-src -type f \
+              \( -name settings.gradle.kts -o -name settings.gradle \) \
+              | head -n 1)
 
-            if [ -z "$GRADLEW_FILE" ]; then
-              echo "ERROR: ZIP mein gradlew nahi mila."
+            if [ -z "$SETTINGS" ]; then
+              echo "ERROR: settings.gradle file nahi mili."
               exit 1
             fi
 
-            PROJECT_DIR=$(dirname "$GRADLEW_FILE")
+            PROJECT=$(dirname "$SETTINGS")
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project found: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
+          echo "Android project found: $PROJECT"
 
       - name: Apply HTML update if available
         shell: bash
         run: |
           set -e
 
-          HTML_FILE=""
+          HTML=""
 
           if [ -f "index.html" ]; then
-            HTML_FILE="index.html"
-          else
-            HTML_FILE=$(find . -maxdepth 3 -type f \
-              -name 'MS-Editor-Media-Hub-Fixed.html' \
-              -not -path './.git/*' | head -n 1 || true)
+            HTML="index.html"
           fi
 
-          if [ -n "$HTML_FILE" ]; then
-            ASSETS_DIR="$PROJECT_DIR/app/src/main/assets"
-            mkdir -p "$ASSETS_DIR"
-            cp "$HTML_FILE" "$ASSETS_DIR/index.html"
-            echo "HTML copied from $HTML_FILE"
+          if [ -n "$HTML" ]; then
+            mkdir -p "$PROJECT_DIR/app/src/main/assets"
+            cp "$HTML" "$PROJECT_DIR/app/src/main/assets/index.html"
+            echo "HTML update copied."
           else
-            echo "No HTML update found; keeping existing app assets."
+            echo "No root index.html found; existing assets preserved."
           fi
 
-      - name: Build Android APK
+      - name: Build APK
         shell: bash
         run: |
           set -e
           cd "$PROJECT_DIR"
-          chmod +x ./gradlew
-          ./gradlew assembleDebug
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
