@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Updated MS Editor APK
 
 on:
   workflow_dispatch:
@@ -29,14 +29,39 @@ jobs:
           unzip MS-Editor.zip -d android-src
           find android-src -name settings.gradle.kts
 
+      - name: Apply new HTML update
+        run: |
+          HTML_FILE="index.html"
+          PROJECT="android-src/ms-editor-media-hub-android-main"
+
+          if [ ! -f "$HTML_FILE" ]; then
+            echo "ERROR: Repository root mein index.html nahi mili."
+            echo "Apni nayi HTML update ko index.html naam se upload karein."
+            exit 1
+          fi
+
+          ASSETS_DIR=$(find "$PROJECT/app/src/main" -type d -name assets | head -n 1)
+
+          if [ -z "$ASSETS_DIR" ]; then
+            mkdir -p "$PROJECT/app/src/main/assets"
+            ASSETS_DIR="$PROJECT/app/src/main/assets"
+          fi
+
+          cp "$HTML_FILE" "$ASSETS_DIR/index.html"
+          echo "New HTML update copied to: $ASSETS_DIR/index.html"
+
+      - name: Set app name
+        run: |
+          sed -i 's/android:label="MS Editor Media Hub"/android:label="MS Editor"/' \
+            android-src/ms-editor-media-hub-android-main/app/src/main/AndroidManifest.xml
+
       - name: Build APK
         run: |
           cd android-src/ms-editor-media-hub-android-main
-          sed -i 's/android:label="MS Editor Media Hub"/android:label="MS Editor"/' app/src/main/AndroidManifest.xml
           gradle assembleDebug
 
-      - name: Upload APK
+      - name: Upload updated APK
         uses: actions/upload-artifact@v4
         with:
-          name: MS-Editor-APK
+          name: MS-Editor-Updated-APK
           path: android-src/ms-editor-media-hub-android-main/app/build/outputs/apk/debug/*.apk
