@@ -17,75 +17,83 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check required files
-        run: |
-          echo "Checking repository files..."
-
-          if [ ! -f "MS-Editor.zip" ]; then
-            echo "ERROR: MS-Editor.zip repository root mein nahi mili."
-            echo "Android project ZIP ko repository root mein upload karein."
-            exit 1
-          fi
-
-          if [ ! -f "index.html" ]; then
-            echo "ERROR: index.html repository root mein nahi mili."
-            echo "Updated HTML file ko index.html naam se upload karein."
-            exit 1
-          fi
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract Android project
+      - name: Find Android project
+        shell: bash
         run: |
-          mkdir -p android-src
-          unzip -q MS-Editor.zip -d android-src
+          set -e
 
-          GRADLE_FILE=$(find android-src -name settings.gradle.kts \
-            -o -name settings.gradle | head -n 1)
+          PROJECT_DIR=""
 
-          if [ -z "$GRADLE_FILE" ]; then
-            echo "ERROR: Android Gradle project nahi mila."
-            exit 1
+          # First, look for an Android project already in the repository.
+          GRADLEW_FILE=$(find . -type f -name gradlew \
+            -not -path './.git/*' | head -n 1 || true)
+
+          if [ -n "$GRADLEW_FILE" ]; then
+            PROJECT_DIR=$(dirname "$GRADLEW_FILE")
+          else
+            # Otherwise, extract an Android project ZIP if one exists.
+            ZIP_FILE=$(find . -maxdepth 2 -type f -iname '*.zip' \
+              -not -path './.git/*' | head -n 1 || true)
+
+            if [ -z "$ZIP_FILE" ]; then
+              echo "ERROR: Android project ya ZIP file nahi mili."
+              exit 1
+            fi
+
+            mkdir -p android-src
+            unzip -q "$ZIP_FILE" -d android-src
+
+            GRADLEW_FILE=$(find android-src -type f -name gradlew \
+              | head -n 1 || true)
+
+            if [ -z "$GRADLEW_FILE" ]; then
+              echo "ERROR: ZIP mein gradlew nahi mila."
+              exit 1
+            fi
+
+            PROJECT_DIR=$(dirname "$GRADLEW_FILE")
           fi
 
-          PROJECT_DIR=$(dirname "$GRADLE_FILE")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Android project found: $PROJECT_DIR"
 
-          echo "Android project: $PROJECT_DIR"
-
-      - name: Apply updated HTML
+      - name: Apply HTML update if available
+        shell: bash
         run: |
-          ASSETS_DIR="$PROJECT_DIR/app/src/main/assets"
-          mkdir -p "$ASSETS_DIR"
+          set -e
 
-          cp index.html "$ASSETS_DIR/index.html"
+          HTML_FILE=""
 
-          echo "Updated HTML copied successfully."
+          if [ -f "index.html" ]; then
+            HTML_FILE="index.html"
+          else
+            HTML_FILE=$(find . -maxdepth 3 -type f \
+              -name 'MS-Editor-Media-Hub-Fixed.html' \
+              -not -path './.git/*' | head -n 1 || true)
+          fi
 
-      - name: Set app name
-        run: |
-          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
-
-          if [ -f "$MANIFEST" ]; then
-            sed -i 's/android:label="MS Editor Media Hub"/android:label="MS Editor"/' "$MANIFEST"
+          if [ -n "$HTML_FILE" ]; then
+            ASSETS_DIR="$PROJECT_DIR/app/src/main/assets"
+            mkdir -p "$ASSETS_DIR"
+            cp "$HTML_FILE" "$ASSETS_DIR/index.html"
+            echo "HTML copied from $HTML_FILE"
+          else
+            echo "No HTML update found; keeping existing app assets."
           fi
 
       - name: Build Android APK
+        shell: bash
         run: |
+          set -e
           cd "$PROJECT_DIR"
-
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleDebug
-          else
-            echo "ERROR: gradlew file nahi mili."
-            echo "Android project mein Gradle wrapper shamil hona chahiye."
-            exit 1
-          fi
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -94,14 +102,3 @@ jobs:
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
-
-### GitHub میں کہاں پیسٹ کرنا ہے؟
-
-1. اپنی [MS Editor GitHub Repository](https://github.com/sajawalkhan12/ms-editor-media-hub-?utm_source=chatgpt.com) کھولیں۔
-2. `.github/workflows/build-apk.yml` فائل کھولیں۔
-3. Edit (✏️) دبائیں اور پرانا کوڈ ہٹا کر اوپر والا کوڈ پیسٹ کریں۔
-4. **Commit changes** دبائیں۔
-5. پھر **Actions** ٹیب میں جا کر build کا نتیجہ دیکھیں۔
-6. کامیاب ہونے پر `MS-Editor-Updated-APK` artifact ڈاؤن لوڈ کریں۔
-
-**اہم:** ریپوزٹری کے مرکزی فولڈر میں `MS-Editor.zip` اور درست شدہ `index.html` دونوں موجود ہونے چاہییں۔ اگر آپ کی ZIP کا نام مختلف ہے تو کوڈ میں اس کا اصل نام استعمال کریں۔ یہ workflow APK بنانے کے لیے ہے؛ بلیک اسکرین اور پوسٹس کا مسئلہ تبھی ٹھیک ہوگا جب `index.html` اور Android project میں اصل خرابی بھی درست ہو۔
